@@ -28,12 +28,23 @@ Map mainPage() {
 	}
 }
 
+/*
+TODO
+
+- figure out a way to only react to the TV modes of denon being on, instead of its sw update
+- get arm/disarm working from innovelli clicks
+- clean up logging
+*/
+
+
 void updated() {
     log.debug "updated()"
     unsubscribe()
 	  initialize()
-    log.debug "updated() done"
 
+    // for debugging
+    //captureLights()
+    //restoreLights()
 
 }
 
@@ -93,23 +104,27 @@ void handler(evt) {
 
 void captureLights() {
     atomicState.lightState = []
-    theLights.each{
-        log.debug "Capture: $it : $it.currentSwitch : $it.currentLevel"
-        atomicState.lightState += [it, it.currentSwitch, it.currentLevel]
+    theLights.eachWithIndex { it, idx ->
+        log.debug "Capture: $it - $it.currentSwitch - $it.currentLevel"
+        atomicState.lightState += [idx: idx, state: it.currentSwitch, level:it.currentLevel]
     }
+    log.debug "Captured $atomicState.lightState.size lights"
 }
 
 void dimLights() {
-    theLights.each{
+    theLights.each {
         it.off()
     }
 }
 
 void restoreLights() {
     log.debug("restoreLights")
-    atomicState.lights.each{
-        log.debug("$it")
-        it[0].on()
+    atomicState.lightState.each{
+        if(it.state == "on") {
+            log.debug "restoring turned on light $it.idx to level $it.level"
+            theLights[it.idx].on()
+            theLights[it.idx].setLevel(it.level)
+        }
     }
 }
 
