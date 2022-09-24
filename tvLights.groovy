@@ -65,10 +65,12 @@ void armDisarmHandler(evt) {
     log.debug "armDisarmHandler() called: ${evt.name} ${evt.value}"
     if(evt.value == "4") { // winefridge on
         log.debug "armDisarmHandler arming"
-        armedSignal.setColor(hue: 25)
+        armedSignal.setColor(hue: 33, saturation:100)
+        atomicState.armed = true
     } else {
         log.debug "armDisarmHandler disarming"
-        armedSignal.setColor(hue: 100)
+        armedSignal.setColor(hue: 0, saturation: 100)
+        atomicState.armed = false
     }
 }
 
@@ -76,17 +78,20 @@ void handler(evt) {
     log.debug "motionHandler() called: ${evt.name} ${evt.value}"
     if(evt.value == "on") {
         log.debug "Denon turned on!"
-        captureLights()
-        dimLights()
+        if(atomicState.armed) {
+            log.debug "Denon triggered dimLights()"
+            captureLights()
+            dimLights()
+        }
     } else {
         log.debug "Denon turned off!"
-        restoreLights()
-
+        if(atomicState.armed) {
+            restoreLights()
+        }
     }
 }
 
 void captureLights() {
-   
     atomicState.lightState = []
     theLights.each{
         log.debug "Capture: $it : $it.currentSwitch : $it.currentLevel"
