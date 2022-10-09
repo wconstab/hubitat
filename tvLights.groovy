@@ -17,11 +17,10 @@ Map mainPage() {
 	dynamicPage(name: "mainPage", title: "TV Lights", uninstall: true, install: true) {
 		section {
             input "theDenon", "capability.switch", title: "The AVR to monitor for on/off", multiple: false
-            input "theLights", "capability.switch", title: "Lights to control", multiple: true
+            input "theLightsOff", "capability.switch", title: "Lights to turn fully off during TV", multiple: true
+            input "theLightsDim", "capability.switch", title: "Lights to dim during TV", multiple: true
 			input "nanoMote", "capability.pushableButton", title: "NanoMote used for arm/disarm and trigger", multiple: false
-            //input "disarmButton", "capability.pushableButton", title: "Disarm Button", multiple: false
             input "armedSignal", "capability.colorControl", title: "Armed Signal Color LED"
-            
             input name:"update", type:"button", title:"Update"
 
 		}
@@ -35,9 +34,6 @@ TODO
 - get arm/disarm working from innovelli clicks
 - clean up logging
 - consider a delay for turning off lights, during delay period user can cancel via remote click
-- set up dimming of lights instead of turning them off
-    - need a UI for specifying multiple lights and their respective dim levels
-    - stopgap just hardcode them? not even sure how to hardcode a device
 */
 
 
@@ -121,27 +117,44 @@ void denonHandler(evt) {
 }
 
 void captureLights() {
-    atomicState.lightState = []
-    theLights.eachWithIndex { it, idx ->
+    atomicState.lightsOffState = []
+    theLightsOff.eachWithIndex { it, idx ->
         log.debug "Capture: $it - $it.currentSwitch - $it.currentLevel"
-        atomicState.lightState += [idx: idx, state: it.currentSwitch, level:it.currentLevel]
+        atomicState.lightsOffState += [idx: idx, state: it.currentSwitch, level:it.currentLevel]
+    }
+    atomicState.lightsDimState = []
+    theLightsDim.eachWithIndex { it, idx ->
+        log.debug "Capture: $it - $it.currentSwitch - $it.currentLevel"
+        atomicState.lightsDimState += [idx: idx, state: it.currentSwitch, level:it.currentLevel]
     }
     log.debug "Captured $atomicState.lightState.size lights"
 }
 
 void dimLights() {
-    theLights.each {
+    theLightsOff.each {
         it.off()
+    }
+    dimLevel = 5
+    theLightsDim.each {
+        it.on()
+        it.setLevel(dimLevel)
     }
 }
 
 void restoreLights() {
     log.debug("restoreLights")
-    atomicState.lightState.each{
+    atomicState.lightsOffState.each{
         if(it.state == "on") {
             log.debug "restoring turned on light $it.idx to level $it.level"
-            theLights[it.idx].on()
-            theLights[it.idx].setLevel(it.level)
+            theLightsOff[it.idx].on()
+            theLightsOff[it.idx].setLevel(it.level)
         }
     }
+    atomicState.lightsDimState.each{
+        if(it.state == "on") {
+            log.debug "restoring turned on light $it.idx to level $it.level"
+            theLightsDim[it.idx].on()
+            theLightsDim[it.idx].setLevel(it.level)
+        }
+    }    
 }
