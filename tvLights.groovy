@@ -18,8 +18,8 @@ Map mainPage() {
 		section {
             input "theDenon", "capability.switch", title: "The AVR to monitor for on/off", multiple: false
             input "theLights", "capability.switch", title: "Lights to control", multiple: true
-			input "armButton", "capability.pushableButton", title: "Arm Button", multiple: false
-            input "disarmButton", "capability.pushableButton", title: "Disarm Button", multiple: false
+			input "nanoMote", "capability.pushableButton", title: "NanoMote used for arm/disarm and trigger", multiple: false
+            //input "disarmButton", "capability.pushableButton", title: "Disarm Button", multiple: false
             input "armedSignal", "capability.colorControl", title: "Armed Signal Color LED"
             
             input name:"update", type:"button", title:"Update"
@@ -34,6 +34,10 @@ TODO
 - figure out a way to only react to the TV modes of denon being on, instead of its sw update
 - get arm/disarm working from innovelli clicks
 - clean up logging
+- consider a delay for turning off lights, during delay period user can cancel via remote click
+- set up dimming of lights instead of turning them off
+    - need a UI for specifying multiple lights and their respective dim levels
+    - stopgap just hardcode them? not even sure how to hardcode a device
 */
 
 
@@ -53,18 +57,12 @@ void installed() {
 }
 
 void initialize() {
-    log.debug "initialize()"
-
-
-	subscribe(theDenon, "switch.off", handler)
-    subscribe(theDenon, "switch.on", handler)
-    subscribe(armButton, "pushed", armDisarmHandler)
-    subscribe(disarmButton, "pushed", armDisarmHandler)
-
-
-	  subscribe(switches, "switch.on", onHandler)
-	  atomicState.someOn = true
-    log.debug "initialize() done"
+	subscribe(theDenon, "switch.off", denonHandler)
+    subscribe(theDenon, "switch.on", denonHandler)
+    subscribe(nanoMote, "pushed", nanoMotePushedHandler)
+    subscribe(nanoMote, "held", nanoMoteHeldHandler)
+	subscribe(switches, "switch.on", onHandler)
+	atomicState.someOn = true
 
 }
 
@@ -72,28 +70,48 @@ def appButtonHandler(update) {
     updated()
 }
 
-void armDisarmHandler(evt) {
-    log.debug "armDisarmHandler() called: ${evt.name} ${evt.value}"
-    if(evt.value == "4") { // winefridge on
-        log.debug "armDisarmHandler arming"
-        armedSignal.setColor(hue: 33, saturation:100)
-        atomicState.armed = true
-    } else {
-        log.debug "armDisarmHandler disarming"
-        armedSignal.setColor(hue: 0, saturation: 100)
-        atomicState.armed = false
-    }
-}
+/*  NanoMote Guide
+1 - moon
+2 - people
+3 - center
+4 - power
+*/
 
-void handler(evt) {
-    log.debug "motionHandler() called: ${evt.name} ${evt.value}"
-    if(evt.value == "on") {
-        log.debug "Denon turned on!"
+void nanoMotePushedHandler(evt) {
+    log.debug "nanoMotePushedHandler() called: ${evt.name} ${evt.value}"
+    if(evt.value == "1") {
         if(atomicState.armed) {
-            log.debug "Denon triggered dimLights()"
+            log.debug "nanoMotePushedHandler triggering TV lights"
             captureLights()
             dimLights()
         }
+    }
+}
+
+void nanoMoteHeldHandler(evt) {
+    log.debug "nanoMoteHeldHandler() called: ${evt.name} ${evt.value}"
+    if(evt.value == "1") {
+        if(atomicState.armed) {
+            log.debug "nanoMote disarming TV lights"
+            armedSignal.setColor(hue: 0, saturation: 100)
+            atomicState.armed = false
+        } else {
+            log.debug "nanoMote arming TV lights"
+            armedSignal.setColor(hue: 33, saturation:100)
+            atomicState.armed = true            
+        }
+    }
+}
+
+void denonHandler(evt) {
+    log.debug "handler() called: ${evt.name} ${evt.value}"
+    if(evt.value == "on") {
+        log.debug "Denon turned on!"
+        //if(atomicState.armed) {
+        //    log.debug "Denon triggered dimLights()"
+        //    captureLights()
+        //    dimLights()
+        //}
     } else {
         log.debug "Denon turned off!"
         if(atomicState.armed) {
@@ -127,4 +145,3 @@ void restoreLights() {
         }
     }
 }
-
