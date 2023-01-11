@@ -20,21 +20,14 @@ Map mainPage() {
             input "theLightsOff", "capability.switch", title: "Lights to turn fully off during TV", multiple: true
             input "theLightsDim", "capability.switch", title: "Lights to dim during TV", multiple: true
 			input "nanoMote", "capability.pushableButton", title: "NanoMote used for arm/disarm and trigger", multiple: false
+            input "watchTvSwitch", "capability.switch", title: "Virtual switch for triggering dim", multiple: false
+            input "watchTvDarkSwitch", "capability.switch", title: "Virtual switch for triggering dark", multiple: false
             input "armedSignal", "capability.colorControl", title: "Armed Signal Color LED"
             input name:"update", type:"button", title:"Update"
 
 		}
 	}
 }
-
-/*
-TODO
-
-- figure out a way to only react to the TV modes of denon being on, instead of its sw update
-- get arm/disarm working from innovelli clicks
-- clean up logging
-- consider a delay for turning off lights, during delay period user can cancel via remote click
-*/
 
 
 void updated() {
@@ -57,9 +50,9 @@ void initialize() {
     subscribe(theDenon, "switch.on", denonHandler)
     subscribe(nanoMote, "pushed", nanoMotePushedHandler)
     subscribe(nanoMote, "held", nanoMoteHeldHandler)
-	subscribe(switches, "switch.on", onHandler)
+    subscribe(watchTvSwitch, "switch.on", watchTvOnHandler)
+    subscribe(watchTvDarkSwitch, "switch.on", watchTvDarkOnHandler)
 	atomicState.someOn = true
-
 }
 
 def appButtonHandler(update) {
@@ -99,15 +92,28 @@ void nanoMoteHeldHandler(evt) {
     }
 }
 
+void watchTvOnHandler(evt) {
+    log.debug "watchTvOnHandler() called: ${evt.name} ${evt.value}"
+    if(atomicState.armed) {
+        log.debug "watchTvOnHandler triggering TV lights"
+        captureLights()
+        dimLights()
+    }
+}
+
+void watchTvDarkOnHandler(evt) {
+    log.debug "watchTvDarkOnHandler() called: ${evt.name} ${evt.value}"
+    if(atomicState.armed) {
+        log.debug "watchTvDarkOnHandler triggering TV lights"
+        captureLights()
+        dimLights(1)
+    }
+}
+
 void denonHandler(evt) {
     log.debug "handler() called: ${evt.name} ${evt.value}"
     if(evt.value == "on") {
         log.debug "Denon turned on!"
-        //if(atomicState.armed) {
-        //    log.debug "Denon triggered dimLights()"
-        //    captureLights()
-        //    dimLights()
-        //}
     } else {
         log.debug "Denon turned off!"
         if(atomicState.armed) {
@@ -130,11 +136,10 @@ void captureLights() {
     log.debug "Captured $atomicState.lightState.size lights"
 }
 
-void dimLights() {
+void dimLights(dimLevel=10) {
     theLightsOff.each {
         it.off()
     }
-    dimLevel = 5
     theLightsDim.each {
         it.on()
         it.setLevel(dimLevel)
