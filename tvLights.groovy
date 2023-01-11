@@ -53,6 +53,7 @@ void initialize() {
     subscribe(watchTvSwitch, "switch.on", watchTvOnHandler)
     subscribe(watchTvDarkSwitch, "switch.on", watchTvDarkOnHandler)
 	atomicState.someOn = true
+    atomicState.haveCaptured = false
 }
 
 def appButtonHandler(update) {
@@ -106,7 +107,7 @@ void watchTvDarkOnHandler(evt) {
     if(atomicState.armed) {
         log.debug "watchTvDarkOnHandler triggering TV lights"
         captureLights()
-        dimLights(1)
+        dimLights(0)
     }
 }
 
@@ -123,31 +124,52 @@ void denonHandler(evt) {
 }
 
 void captureLights() {
-    atomicState.lightsOffState = []
-    theLightsOff.eachWithIndex { it, idx ->
-        log.debug "Capture: $it - $it.currentSwitch - $it.currentLevel"
-        atomicState.lightsOffState += [idx: idx, state: it.currentSwitch, level:it.currentLevel]
+    if(!atomicState.haveCaptured) {
+       atomicState.haveCaptured = true
+       atomicState.lightsOffState = []
+       theLightsOff.eachWithIndex { it, idx ->
+           log.debug "Capture: $it - $it.currentSwitch - $it.currentLevel"
+           atomicState.lightsOffState += [idx: idx, state: it.currentSwitch, level:it.currentLevel]
+       }
+       atomicState.lightsDimState = []
+       theLightsDim.eachWithIndex { it, idx ->
+           log.debug "Capture: $it - $it.currentSwitch - $it.currentLevel"
+           atomicState.lightsDimState += [idx: idx, state: it.currentSwitch, level:it.currentLevel]
+       }
+       log.debug "Captured $atomicState.lightState.size lights"
     }
-    atomicState.lightsDimState = []
-    theLightsDim.eachWithIndex { it, idx ->
-        log.debug "Capture: $it - $it.currentSwitch - $it.currentLevel"
-        atomicState.lightsDimState += [idx: idx, state: it.currentSwitch, level:it.currentLevel]
-    }
-    log.debug "Captured $atomicState.lightState.size lights"
 }
 
-void dimLights(dimLevel=10) {
+void dimLights(dimLevel=20) {
+    if(dimLevel == 0){
+        log.debug "dim 0 optimization"
+        theLightsDim.each {
+            it.off()
+        }
+    }
+    else {
+        log.debug "regular dim"
+
+        theLightsDim.each {
+            it.on()
+            it.setLevel(dimLevel)
+        }
+    }
     theLightsOff.each {
         it.off()
     }
-    theLightsDim.each {
-        it.on()
-        it.setLevel(dimLevel)
-    }
+
 }
 
 void restoreLights() {
     log.debug("restoreLights")
+    atomicState.lightsDimState.each{
+        if(it.state == "on") {
+            log.debug "restoring dimmed light $it.idx to level $it.level"
+            theLightsDim[it.idx].on()
+            theLightsDim[it.idx].setLevel(it.level)
+        }
+    }
     atomicState.lightsOffState.each{
         if(it.state == "on") {
             log.debug "restoring turned on light $it.idx to level $it.level"
@@ -155,11 +177,6 @@ void restoreLights() {
             theLightsOff[it.idx].setLevel(it.level)
         }
     }
-    atomicState.lightsDimState.each{
-        if(it.state == "on") {
-            log.debug "restoring turned on light $it.idx to level $it.level"
-            theLightsDim[it.idx].on()
-            theLightsDim[it.idx].setLevel(it.level)
-        }
-    }    
+
+    atomicState.haveCaptured = false
 }
