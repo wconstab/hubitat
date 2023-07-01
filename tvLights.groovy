@@ -75,7 +75,14 @@ void nanoMotePushedHandler(evt) {
             captureLights()
             dimLights()
         }
+    } else if(evt.value == "2") {
+        if(atomicState.armed) {
+            log.debug "nanoMotePushedHandler triggering TV lights (dark"
+            captureLights()
+            dimLights(0)
+        }
     }
+    
 }
 
 void nanoMoteHeldHandler(evt) {
@@ -140,16 +147,13 @@ void captureLights() {
     }
 }
 
-void dimLights(dimLevel=20) {
+void dimLights(dimLevel=8) {
     if(dimLevel == 0){
-        log.debug "dim 0 optimization"
         theLightsDim.each {
             it.off()
         }
     }
     else {
-        log.debug "regular dim"
-
         theLightsDim.each {
             it.on()
             it.setLevel(dimLevel)
@@ -162,21 +166,22 @@ void dimLights(dimLevel=20) {
 }
 
 void restoreLights() {
-    log.debug("restoreLights")
-    atomicState.lightsDimState.each{
-        if(it.state == "on") {
-            log.debug "restoring dimmed light $it.idx to level $it.level"
-            theLightsDim[it.idx].on()
-            theLightsDim[it.idx].setLevel(it.level)
+    if(atomicState.haveCaptured) {
+        atomicState.lightsDimState.each{
+            if(it.state == "on") {
+                log.debug "restoring dimmed light $it.idx to level $it.level"
+                theLightsDim[it.idx].on()
+                theLightsDim[it.idx].setLevel(it.level)
+            }
         }
-    }
-    atomicState.lightsOffState.each{
-        if(it.state == "on") {
-            log.debug "restoring turned on light $it.idx to level $it.level"
-            theLightsOff[it.idx].on()
-            theLightsOff[it.idx].setLevel(it.level)
+        atomicState.lightsOffState.each{
+            if(it.state == "on") {
+                log.debug "restoring turned on light $it.idx to level $it.level"
+                theLightsOff[it.idx].on()
+                theLightsOff[it.idx].setLevel(it.level)
+            }
         }
-    }
 
-    atomicState.haveCaptured = false
+        atomicState.haveCaptured = false
+    }
 }
